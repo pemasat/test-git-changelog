@@ -2,6 +2,11 @@ import fs from "fs";
 import path from "path";
 import inquirer from "inquirer";
 import simpleGit from "simple-git";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const git = simpleGit();
 const versionFile = path.resolve(__dirname, "version.txt");
@@ -64,13 +69,17 @@ const deleteRemoteTag = async (tag: string) => {
   const current = readCurrentVersion();
   const currentTag = `${current.X}.${current.Y}.${current.Z}.${current.R}`;
 
+  const newTagMakeUATRelease = `${current.X}.${current.Y}.${current.Z}.${
+    current.R + 1
+  }`;
+
   const { releaseType } = await inquirer.prompt([
     {
       type: "list",
       name: "releaseType",
       message: "Select release type:",
       choices: [
-        "UAT release",
+        `UAT release, current version: ${currentTag}, changes will be tagged as ${newTagMakeUATRelease}`,
         "UAT start work on next release",
         "PROD release",
         "GENERATION",
@@ -80,13 +89,12 @@ const deleteRemoteTag = async (tag: string) => {
 
   if (releaseType === "UAT release") {
     current.R++;
-    const newTag = `${current.X}.${current.Y}.${current.Z}.${current.R}`;
     writeVersion(current);
     const logs = await getChangelogSince(currentTag);
-    await git.addTag(newTag);
+    await git.addTag(newTagMakeUATRelease);
     await git.pushTags();
-    updateChangelog(newTag, logs);
-    console.log(`✅ UAT released: ${newTag}`);
+    updateChangelog(newTagMakeUATRelease, logs);
+    console.log(`✅ UAT released: ${newTagMakeUATRelease}`);
   } else if (releaseType === "UAT start work on next release") {
     current.Z++;
     current.R = 0;

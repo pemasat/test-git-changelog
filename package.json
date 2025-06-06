@@ -7,7 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "commit": "npx --package cz-emoji-conventional --package commitizen -- cz",
-    "release": "ts-node --esm ./release.ts"
+    "release": "node --loader ts-node/esm ./release.ts"
   },
   "author": "",
   "license": "ISC",

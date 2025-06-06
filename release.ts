@@ -37,13 +37,25 @@ const getAllTags = async () => {
   return tags.all.filter((tag) => /^\d+\.\d+\.\d+\.\d+$/.test(tag));
 };
 
+const tagExists = async (tag: string): Promise<boolean> => {
+  const allTags = await git.tags();
+  return allTags.all.includes(tag);
+};
+
 const getChangelogSince = async (fromTag: string): Promise<string[]> => {
+  const exists = await tagExists(fromTag);
+  if (!exists) {
+    console.warn(`Tag '${fromTag}' does not exist. Skipping changelog.`);
+    return [];
+  }
+
   const logs = await git.raw([
     "log",
     `${fromTag}..HEAD`,
     "--pretty=format:%s",
     "--no-merges",
   ]);
+
   return logs
     .split("\n")
     .filter((line) => /^[\u{1F4A5}\u{2728}\u{1F41B}]/u.test(line.trim()));
@@ -73,24 +85,33 @@ const deleteRemoteTag = async (tag: string) => {
     current.R + 1
   }`;
 
+  const choices = [
+    `UAT release, current version: ${currentTag}, changes will be tagged as ${newTagMakeUATRelease}`,
+    "UAT start work on next release",
+    "PROD release",
+    "GENERATION",
+  ];
+
   const { releaseType } = await inquirer.prompt([
     {
       type: "list",
       name: "releaseType",
       message: "Select release type:",
-      choices: [
-        `UAT release, current version: ${currentTag}, changes will be tagged as ${newTagMakeUATRelease}`,
-        "UAT start work on next release",
-        "PROD release",
-        "GENERATION",
-      ],
+      choices,
     },
   ]);
 
-  if (releaseType === "UAT release") {
+  if (releaseType === choices[0]) {
     current.R++;
     writeVersion(current);
     const logs = await getChangelogSince(currentTag);
+    console.log(`Preparing UAT release: ${newTagMakeUATRelease}`);
+    if (logs.length === 0) {
+      console.log("No changes to release, exiting.");
+      return;
+    }
+    console.log(`Changes since last release:\n${logs.join("\n")}`);
+
     await git.addTag(newTagMakeUATRelease);
     await git.pushTags();
     updateChangelog(newTagMakeUATRelease, logs);

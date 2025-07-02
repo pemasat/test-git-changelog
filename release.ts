@@ -104,6 +104,11 @@ const getChangelogSince = async (fromTag: string): Promise<string[]> => {
 };
 
 const updateChangelog = (version: string, logLines: string[]) => {
+  console.log(`Updating changelog for version`, {
+    version,
+    logLines,
+  });
+
   const date = new Date().toISOString().split("T")[0];
   const entry = `## ${version} (${date})\n${logLines
     .map((l) => `- ${l}`)
@@ -182,8 +187,10 @@ const getUnchangedFileCount = async () => {
     console.log(`Changes since last release:\n${logs.join("\n")}`);
 
     await git.addTag(newTagMakeUATRelease);
-    await git.pushTags();
     updateChangelog(newTagMakeUATRelease, logs);
+    await deleteRemoteTag("UAT-LATEST");
+    await git.addTag("UAT-LATEST");
+    await git.pushTags();
     console.log(`✅ UAT released: ${newTagMakeUATRelease}`);
   } else if (releaseType === "UAT start work on next release") {
     current.Z++;

@@ -7,18 +7,17 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "commit": "npx --package cz-emoji-conventional --package commitizen -- cz",
-    "release": "node --loader ts-node/esm ./release.ts"
+    "release": "npx tsx ./release.ts"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "fs": "^0.0.1-security",
     "inquirer": "^12.6.1",
-    "path": "^0.12.7",
     "simple-git": "^3.27.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
   }
 }

@@ -19,7 +19,38 @@ interface Version {
   R: number; // revision version, changed when we make a new UAT release
 }
 
-const readCurrentVersion = (): Version => {
+const loadRemoteTags = async () => {
+  try {
+    await git.fetch(["--tags"]);
+  } catch (error) {
+    console.error("Failed to fetch remote tags:", error);
+    throw error;
+  }
+};
+
+const findBiggerVersion = async () => {
+  // compare current version in version.txt with all remote tags
+  await loadRemoteTags();
+  const currentVersion = readCurrentVersionFromFile();
+  const allTags = await getAllTags();
+  const biggerTags = allTags.filter((tag) => {
+    const [X, Y, Z, R] = tag.split(".").map(Number);
+    return (
+      X > currentVersion.X ||
+      (X === currentVersion.X && Y > currentVersion.Y) ||
+      (X === currentVersion.X &&
+        Y === currentVersion.Y &&
+        Z > currentVersion.Z) ||
+      (X === currentVersion.X &&
+        Y === currentVersion.Y &&
+        Z === currentVersion.Z &&
+        R > currentVersion.R)
+    );
+  });
+  return biggerTags.length > 0 ? biggerTags[0] : null;
+};
+
+const readCurrentVersionFromFile = (): Version => {
   const [X, Y, Z, R] = fs
     .readFileSync(versionFile, "utf-8")
     .trim()
@@ -28,13 +59,20 @@ const readCurrentVersion = (): Version => {
   return { X, Y, Z, R };
 };
 
-const writeVersion = (v: Version) => {
+const writeVersionIntoFile = (v: Version) => {
   fs.writeFileSync(versionFile, `${v.X}.${v.Y}.${v.Z}.${v.R}`, "utf-8");
 };
 
 const getAllTags = async () => {
   const tags = await git.tags();
-  return tags.all.filter((tag) => /^\d+\.\d+\.\d+\.\d+$/.test(tag));
+  return tags.all
+    .filter((tag) => /^\d+\.\d+\.\d+\.\d+$/.test(tag))
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+};
+
+const getLatestTag = async (): Promise<string | null> => {
+  const tags = await getAllTags();
+  return tags.length > 0 ? tags[0] : null;
 };
 
 const tagExists = async (tag: string): Promise<boolean> => {
@@ -44,6 +82,9 @@ const tagExists = async (tag: string): Promise<boolean> => {
 
 const getChangelogSince = async (fromTag: string): Promise<string[]> => {
   const exists = await tagExists(fromTag);
+  const allTags = await getAllTags();
+  console.log({ exists, fromTag, allTags });
+
   if (!exists) {
     console.warn(`Tag '${fromTag}' does not exist. Skipping changelog.`);
     return [];
@@ -55,6 +96,7 @@ const getChangelogSince = async (fromTag: string): Promise<string[]> => {
     "--pretty=format:%s",
     "--no-merges",
   ]);
+  console.log({ logs });
 
   return logs
     .split("\n")
@@ -77,16 +119,40 @@ const deleteRemoteTag = async (tag: string) => {
   await git.tag(["-d", tag]).catch(() => {});
 };
 
+const getUnchangedFileCount = async () => {
+  try {
+    const status = await git.status();
+    return (
+      status.not_added.length + status.renamed.length + status.modified.length
+    );
+  } catch (error) {
+    console.error("Failed to get unchanged file count:", error);
+    return -1; // Indicate an error
+  }
+};
+
 (async () => {
-  const current = readCurrentVersion();
-  const currentTag = `${current.X}.${current.Y}.${current.Z}.${current.R}`;
+  const unchangedFileCount = await getUnchangedFileCount();
+  if (unchangedFileCount > 0) {
+    console.error(
+      `There are ${unchangedFileCount} unchanged files. Please commit or stash them before proceeding.`
+    );
+    return;
+  }
+
+  const current = readCurrentVersionFromFile();
+
+  const latestVersion = await findBiggerVersion();
+  const latestTagVersion = getLatestTag();
+  const currentVersionStr = `${current.X}.${current.Y}.${current.Z}.${current.R}`;
+  const displayVersion = latestVersion || currentVersionStr;
 
   const newTagMakeUATRelease = `${current.X}.${current.Y}.${current.Z}.${
     current.R + 1
   }`;
 
   const choices = [
-    `UAT release, current version: ${currentTag}, changes will be tagged as ${newTagMakeUATRelease}`,
+    `UAT release, current version: ${displayVersion}, changes will be tagged as ${newTagMakeUATRelease}`,
     "UAT start work on next release",
     "PROD release",
     "GENERATION",
@@ -103,8 +169,11 @@ const deleteRemoteTag = async (tag: string) => {
 
   if (releaseType === choices[0]) {
     current.R++;
-    writeVersion(current);
-    const logs = await getChangelogSince(currentTag);
+    writeVersionIntoFile(current);
+
+    const fromTag =
+      (await latestTagVersion) || latestVersion || currentVersionStr;
+    const logs = await getChangelogSince(fromTag);
     console.log(`Preparing UAT release: ${newTagMakeUATRelease}`);
     if (logs.length === 0) {
       console.log("No changes to release, exiting.");
@@ -119,7 +188,7 @@ const deleteRemoteTag = async (tag: string) => {
   } else if (releaseType === "UAT start work on next release") {
     current.Z++;
     current.R = 0;
-    writeVersion(current);
+    writeVersionIntoFile(current);
     console.log(
       `✅ Started work on UAT release: ${current.X}.${current.Y}.${current.Z}.${current.R}`
     );
@@ -154,7 +223,7 @@ const deleteRemoteTag = async (tag: string) => {
     current.Y++;
     current.Z = 0;
     current.R = 0;
-    writeVersion(current);
+    writeVersionIntoFile(current);
     console.log(
       `✅ Generation version updated to: ${current.X}.${current.Y}.0.0`
     );

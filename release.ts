@@ -103,12 +103,7 @@ const getChangelogSince = async (fromTag: string): Promise<string[]> => {
     .filter((line) => /^[\u{1F4A5}\u{2728}\u{1F41B}]/u.test(line.trim()));
 };
 
-const updateChangelog = (version: string, logLines: string[]) => {
-  console.log(`Updating changelog for version`, {
-    version,
-    logLines,
-  });
-
+const updateChangelogAndCommitIt = (version: string, logLines: string[]) => {
   const date = new Date().toISOString().split("T")[0];
   const entry = `## ${version} (${date})\n${logLines
     .map((l) => `- ${l}`)
@@ -117,6 +112,8 @@ const updateChangelog = (version: string, logLines: string[]) => {
     ? fs.readFileSync(changelogFile, "utf-8")
     : "";
   fs.writeFileSync(changelogFile, entry + existing);
+  git.add(changelogFile);
+  git.commit(`🧹 chore: update changelog for ${version}`);
 };
 
 const deleteRemoteTag = async (tag: string) => {
@@ -186,8 +183,8 @@ const getUnchangedFileCount = async () => {
     }
     console.log(`Changes since last release:\n${logs.join("\n")}`);
 
+    updateChangelogAndCommitIt(newTagMakeUATRelease, logs);
     await git.addTag(newTagMakeUATRelease);
-    updateChangelog(newTagMakeUATRelease, logs);
     await deleteRemoteTag("UAT-LATEST");
     await git.addTag("UAT-LATEST");
     await git.pushTags();

@@ -1,3 +1,6 @@
+## 4.3.1.27 (2025-07-17)
+- ✨ feat: async
+
 ## 4.3.1.26 (2025-07-17)
 - ✨ feat: polishing
 - ✨ feat: cleaning

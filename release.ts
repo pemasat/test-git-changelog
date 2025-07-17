@@ -112,7 +112,7 @@ const updateChangelogAndCommitIt = (version: string, logLines: string[]) => {
     ? fs.readFileSync(changelogFile, "utf-8")
     : "";
   fs.writeFileSync(changelogFile, entry + existing);
-  git.add(changelogFile);
+  git.add([changelogFile, versionFile]);
   git.commit(`🧹 chore: update changelog for ${version}`);
 };
 
@@ -184,6 +184,7 @@ const getUnchangedFileCount = async () => {
     console.log(`Changes since last release:\n${logs.join("\n")}`);
 
     updateChangelogAndCommitIt(newTagMakeUATRelease, logs);
+
     await git.addTag(newTagMakeUATRelease);
     await deleteRemoteTag("UAT-LATEST");
     await git.addTag("UAT-LATEST");

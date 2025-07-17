@@ -117,6 +117,8 @@ const updateChangelogAndCommitIt = async (
   fs.writeFileSync(changelogFile, entry + existing);
   await git.add([changelogFile, versionFile]);
   await git.commit(`🧹 chore: update changelog for ${version}`);
+  await git.push();
+  console.log(`Changelog updated and committed for version ${version}`);
 };
 
 const deleteRemoteTag = async (tag: string) => {

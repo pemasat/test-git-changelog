@@ -147,14 +147,14 @@ const getUnchangedFileCount = async () => {
   const latestVersion = await findBiggerVersion();
   const latestTagVersion = getLatestTag();
   const currentVersionStr = `${current.X}.${current.Y}.${current.Z}.${current.R}`;
-  const displayVersion = latestVersion || currentVersionStr;
+  const actualFoundLatestVersion = latestVersion || currentVersionStr;
 
   const newTagMakeUATRelease = `${current.X}.${current.Y}.${current.Z}.${
     current.R + 1
   }`;
 
   const choices = [
-    `UAT release, current version: ${displayVersion}, changes will be tagged as ${newTagMakeUATRelease}`,
+    `UAT release, current version: ${actualFoundLatestVersion}, changes will be tagged as ${newTagMakeUATRelease}`,
     "UAT start work on next release",
     "PROD release",
     "GENERATION",
